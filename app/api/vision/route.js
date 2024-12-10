@@ -47,7 +47,6 @@ async function uploadToCloudStorage(filePath, destination) {
   await storageClient.bucket(BUCKET_NAME).upload(filePath, {
     destination,
   });
-  console.log(`File uploaded to ${destination}`);
   return `gs://${BUCKET_NAME}/${destination}`;
 }
 
@@ -71,7 +70,6 @@ async function processPdf(filePath) {
     ],
   });
 
-  console.log("Processing PDF...");
   const [response] = await operation.promise();
 
   const [result] = await storageClient

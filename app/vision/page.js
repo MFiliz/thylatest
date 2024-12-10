@@ -16,22 +16,12 @@ export default function OCRPage() {
   const [file, setFile] = useState(null);
   const [fileType, setFileType] = useState("image");
   const [results, setResults] = useState([]);
+  const [resultsex, setResultsEx] = useState([]);
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [language, setLanguage] = useState("TR"); // Varsayılan dil Türkçe
-  const [isMobile, setIsMobile] = useState(false);
-
-  useEffect(() => {
-    const checkMobile = () => {
-      const userAgent = navigator.userAgent || navigator.vendor || window.opera;
-      return /android|iphone|ipad|ipod|blackberry|windows phone|mobile/i.test(
-        userAgent
-      );
-    };
-
-    setIsMobile(checkMobile());
-    console.log(results);
-  }, []);
+  const [language, setLanguage] = useState("GB"); // Varsayılan dil Türkçe
+  const [firstCall, setfirstCall] = useState(true);
 
   const handleFileChange = (event) => {
     const selectedFile = event.target.files[0];
@@ -71,7 +61,6 @@ export default function OCRPage() {
 
       const data = await response.json();
       if (response.ok) {
-        //setResults(data.text || []);
         sendMessage(data.text);
       } else {
         throw new Error(data.error || "Something went wrong");
@@ -79,8 +68,6 @@ export default function OCRPage() {
     } catch (err) {
       setError(err.message);
     } finally {
-      //sendMessage();
-      //setLoading(false);
     }
   };
 
@@ -94,8 +81,6 @@ export default function OCRPage() {
 
   const sendMessage = async (text) => {
     try {
-      //addMessageToChatHistory({ role: "user", content: text });
-
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: {
@@ -108,12 +93,19 @@ export default function OCRPage() {
 
       if (response.ok) {
         setResults(data.reply || []);
+        setResultsEx(data.reply || []);
+
+        if (firstCall) {
+          addMessageToChatHistory({
+            role: "system",
+            content: translations[language].initparams,
+          });
+          setfirstCall(false);
+        }
         addMessageToChatHistory({
-          role: "system",
-          content:
-            "Sen bir yemek uzmanısın. Kullanıcıya menü analizi ve yemek önerileri hakkında yardımcı ol.",
+          role: "assistant",
+          content: JSON.stringify(data.reply),
         });
-        addMessageToChatHistory({ role: "asistant", content: data.reply });
       } else {
         console.error(data.error);
       }
@@ -124,6 +116,37 @@ export default function OCRPage() {
     }
   };
 
+  const sendRegularMessage = async (text) => {
+    try {
+      var tw = text + translations[language].responselanguage;
+      addMessageToChatHistory({
+        role: "user",
+        content: JSON.stringify(tw),
+      });
+
+      var mess = getChatHistory();
+      const response = await fetch("/api/regularchatter", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          message: mess,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        addMessageToChatHistory({ role: "assistant", content: data.reply });
+        return data.reply;
+      } else {
+        console.error(data.error);
+      }
+    } catch (error) {
+      console.error("Bir hata oluştu:", error);
+    }
+  };
   const flow = {
     start: {
       message: translations[language].greeting,
@@ -136,7 +159,8 @@ export default function OCRPage() {
     },
     loop: {
       message: async (params) => {
-        await params.injectMessage("Deneme");
+        var qq = await sendRegularMessage(params.userInput);
+        await params.injectMessage(qq);
       },
       path: () => {
         if (error) {
@@ -181,10 +205,10 @@ export default function OCRPage() {
 
   return (
     <div>
-      {loading && <Overlay message="as" />}
-      {results.length > 0 ? (
+      {loading && <Overlay message={translations[language].overlaymessage} />}
+      {resultsex.length > 0 ? (
         <div className="bg-gradient-to-br from-[#f0f0f0] to-[#ffffff] md:from-[#f0f0f0] md:to-[#ffffff]">
-          <FoodComponent data={results} language={language} />
+          <FoodComponent data={resultsex} language={language} />
           <ChatBot key={language} flow={flow} settings={settings} />
           <div
             style={{
@@ -218,10 +242,10 @@ export default function OCRPage() {
           <div>
             <div className="bg-white w-[400px] rounded-lg shadow-lg p-6 md:ml-[15%] border-2 border-gray-100">
               <h2 className="text-xl font-bold text-gray-800 text-center mb-4">
-                Dosya Paylaşımı
+                {translations[language].mainpagetitle}
               </h2>
               <p className="text-sm text-gray-600 text-center mb-6">
-                Dosyalarınızı buradan paylaşabilirsiniz. Maksimum boyut: 2GB.
+                {translations[language].mainpagedescription}
               </p>
 
               {/* Dosya Yükleme Alanı */}
@@ -229,7 +253,9 @@ export default function OCRPage() {
                 <div className="border-2 border-gray-300 rounded-lg p-6 text-center cursor-pointer hover:border-red-500 transition">
                   <label htmlFor="file" className="cursor-pointer">
                     <p className="text-gray-500">
-                      Buraya dosya sürükleyin ya da yüklemek için tıklayın.
+                      {file == null
+                        ? translations[language].mainpageclick
+                        : "Ready"}
                     </p>
                     <input
                       type="file"
@@ -246,7 +272,7 @@ export default function OCRPage() {
                   className="mt-6 w-full bg-red-500 text-white py-2 rounded-lg hover:bg-red-600 transition"
                   type="submit"
                 >
-                  Gönder
+                  {translations[language].mainpagesend}
                 </button>
               </form>
             </div>
